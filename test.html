@@ -1,0 +1,603 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Focus & Visibility Tester</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: #eee;
+        }
+
+        header {
+            padding: 20px;
+            border-bottom: 1px solid #333;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+        }
+
+        #status {
+            display: inline-block;
+            padding: 8px 14px;
+            border-radius: 6px;
+            background: #333;
+            margin-top: 10px;
+        }
+
+        #status.focused {
+            background: #14532d;
+        }
+
+        #status.blurred {
+            background: #7f1d1d;
+        }
+
+        .controls {
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 15px;
+            border: 1px solid #444;
+            background: #222;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        #events {
+            margin: 0 20px 20px;
+            background: #080808;
+            border: 1px solid #333;
+            border-radius: 8px;
+            height: 500px;
+            overflow-y: auto;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+
+        .event {
+            padding: 7px 0;
+            border-bottom: 1px solid #1d1d1d;
+        }
+
+        .time {
+            color: #888;
+        }
+
+        .type {
+            color: #60a5fa;
+        }
+
+        .important {
+            color: #f87171;
+            font-weight: bold;
+        }
+
+        .info {
+            color: #4ade80;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Focus & Visibility Tester</h1>
+
+    <div>
+        Estado:
+        <span id="status">Detectando...</span>
+    </div>
+
+    <div>
+        Visibility:
+        <span id="visibility">...</span>
+    </div>
+
+    <div>
+        Focus:
+        <span id="focus">...</span>
+    </div>
+</header>
+
+<div class="controls">
+    <button onclick="clearEvents()">Limpiar eventos</button>
+    <button onclick="testNotification()">Probar notificación</button>
+    <button onclick="requestNotificationPermission()">
+        Permitir notificaciones
+    </button>
+</div>
+
+<div id="events"></div>
+
+<script>
+
+    // ============================================================
+    // ELEMENTOS
+    // ============================================================
+
+    const statusElement = document.getElementById("status");
+    const visibilityElement = document.getElementById("visibility");
+    const focusElement = document.getElementById("focus");
+    const eventsElement = document.getElementById("events");
+
+
+    // ============================================================
+    // ESTADO ACTUAL
+    // ============================================================
+
+    function updateState() {
+
+        const hasFocus = document.hasFocus();
+        const visibility = document.visibilityState;
+
+        visibilityElement.textContent = visibility;
+        focusElement.textContent = hasFocus ? "FOCUS" : "NO FOCUS";
+
+        if (hasFocus && visibility === "visible") {
+
+            statusElement.textContent = "ACTIVA / CON FOCO";
+            statusElement.className = "focused";
+
+        } else {
+
+            statusElement.textContent = "SIN FOCO / NO VISIBLE";
+            statusElement.className = "blurred";
+
+        }
+    }
+
+
+    // ============================================================
+    // LOGGER
+    // ============================================================
+
+    function logEvent(type, message, important = false) {
+
+        const now = new Date();
+
+        const time =
+            now.toLocaleTimeString() +
+            "." +
+            String(now.getMilliseconds()).padStart(3, "0");
+
+        const div = document.createElement("div");
+
+        div.className = "event";
+
+        div.innerHTML = `
+            <span class="time">[${time}]</span>
+            <span class="${important ? "important" : "type"}">
+                ${type}
+            </span>
+            -
+            ${message}
+        `;
+
+        eventsElement.prepend(div);
+
+        console.log(
+            `[${time}] ${type}: ${message}`
+        );
+    }
+
+
+    // ============================================================
+    // WINDOW FOCUS
+    // ============================================================
+
+    window.addEventListener("focus", () => {
+
+        updateState();
+
+        logEvent(
+            "WINDOW FOCUS",
+            "La ventana volvió a recibir foco.",
+            false
+        );
+
+    });
+
+
+    // ============================================================
+    // WINDOW BLUR
+    // ============================================================
+
+    window.addEventListener("blur", () => {
+
+        updateState();
+
+        logEvent(
+            "WINDOW BLUR",
+            "La ventana perdió el foco.",
+            true
+        );
+
+    });
+
+
+    // ============================================================
+    // DOCUMENT VISIBILITY
+    // ============================================================
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            updateState();
+
+            if (document.visibilityState === "hidden") {
+
+                logEvent(
+                    "VISIBILITY HIDDEN",
+                    "La página dejó de estar visible.",
+                    true
+                );
+
+            } else {
+
+                logEvent(
+                    "VISIBILITY VISIBLE",
+                    "La página volvió a ser visible.",
+                    false
+                );
+
+            }
+
+        }
+    );
+
+
+    // ============================================================
+    // PAGE HIDE
+    // ============================================================
+
+    window.addEventListener(
+        "pagehide",
+        (event) => {
+
+            logEvent(
+                "PAGEHIDE",
+                `La página está siendo ocultada. persisted=${event.persisted}`,
+                true
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // PAGE SHOW
+    // ============================================================
+
+    window.addEventListener(
+        "pageshow",
+        (event) => {
+
+            logEvent(
+                "PAGESHOW",
+                `La página volvió a mostrarse. persisted=${event.persisted}`,
+                false
+            );
+
+            updateState();
+
+        }
+    );
+
+
+    // ============================================================
+    // BEFORE UNLOAD
+    // ============================================================
+
+    window.addEventListener(
+        "beforeunload",
+        () => {
+
+            logEvent(
+                "BEFOREUNLOAD",
+                "La página está a punto de descargarse.",
+                true
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // FREEZE
+    // ============================================================
+
+    document.addEventListener(
+        "freeze",
+        () => {
+
+            logEvent(
+                "FREEZE",
+                "El navegador congeló la página.",
+                true
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // RESUME
+    // ============================================================
+
+    document.addEventListener(
+        "resume",
+        () => {
+
+            logEvent(
+                "RESUME",
+                "El navegador reanudó la página.",
+                false
+            );
+
+            updateState();
+
+        }
+    );
+
+
+    // ============================================================
+    // PAGE VISIBILITY
+    // ============================================================
+
+    window.addEventListener(
+        "pageshow",
+        updateState
+    );
+
+
+    // ============================================================
+    // FULLSCREEN
+    // ============================================================
+
+    document.addEventListener(
+        "fullscreenchange",
+        () => {
+
+            const fullscreen =
+                document.fullscreenElement !== null;
+
+            logEvent(
+                "FULLSCREEN",
+                fullscreen
+                    ? "Entró en fullscreen."
+                    : "Salió de fullscreen.",
+                false
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // POINTER EVENTS
+    // ============================================================
+
+    window.addEventListener(
+        "pointerleave",
+        () => {
+
+            logEvent(
+                "POINTER LEAVE",
+                "El puntero salió del área de la ventana.",
+                false
+            );
+
+        }
+    );
+
+
+    window.addEventListener(
+        "pointerenter",
+        () => {
+
+            logEvent(
+                "POINTER ENTER",
+                "El puntero entró en el área de la ventana.",
+                false
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // MOUSE LEAVE
+    // ============================================================
+
+    document.addEventListener(
+        "mouseleave",
+        () => {
+
+            logEvent(
+                "MOUSE LEAVE",
+                "El mouse salió del documento.",
+                false
+            );
+
+        }
+    );
+
+
+    document.addEventListener(
+        "mouseenter",
+        () => {
+
+            logEvent(
+                "MOUSE ENTER",
+                "El mouse entró al documento.",
+                false
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // KEYBOARD
+    // ============================================================
+
+    document.addEventListener(
+        "keydown",
+        (event) => {
+
+            logEvent(
+                "KEYDOWN",
+                `Tecla: ${event.key} | Ctrl=${event.ctrlKey} Shift=${event.shiftKey} Alt=${event.altKey}`,
+                false
+            );
+
+        }
+    );
+
+
+    // ============================================================
+    // DOCUMENT HAS FOCUS
+    // ============================================================
+
+    setInterval(
+        () => {
+
+            const focus = document.hasFocus();
+            const visibility = document.visibilityState;
+
+            updateState();
+
+        },
+        500
+    );
+
+
+    // ============================================================
+    // NOTIFICACIONES
+    // ============================================================
+
+    async function requestNotificationPermission() {
+
+        if (!("Notification" in window)) {
+
+            logEvent(
+                "NOTIFICATION",
+                "Este navegador no soporta Notification API.",
+                true
+            );
+
+            return;
+        }
+
+        const permission =
+            await Notification.requestPermission();
+
+        logEvent(
+            "NOTIFICATION PERMISSION",
+            `Permiso: ${permission}`,
+            false
+        );
+    }
+
+
+    function testNotification() {
+
+        if (!("Notification" in window)) {
+
+            logEvent(
+                "NOTIFICATION",
+                "Notifications API no disponible.",
+                true
+            );
+
+            return;
+        }
+
+        if (Notification.permission !== "granted") {
+
+            logEvent(
+                "NOTIFICATION",
+                "Primero debes permitir las notificaciones.",
+                true
+            );
+
+            return;
+        }
+
+        new Notification(
+            "Focus Tester",
+            {
+                body: "Esta es una notificación de prueba."
+            }
+        );
+
+        logEvent(
+            "NOTIFICATION SENT",
+            "Notificación enviada.",
+            false
+        );
+    }
+
+
+    // ============================================================
+    // LIMPIAR
+    // ============================================================
+
+    function clearEvents() {
+
+        eventsElement.innerHTML = "";
+
+        logEvent(
+            "SYSTEM",
+            "Registro limpiado.",
+            false
+        );
+
+    }
+
+
+    // ============================================================
+    // ESTADO INICIAL
+    // ============================================================
+
+    updateState();
+
+    logEvent(
+        "SYSTEM",
+        "Tester iniciado.",
+        false
+    );
+
+    logEvent(
+        "INITIAL STATE",
+        `hasFocus=${document.hasFocus()}, visibility=${document.visibilityState}`,
+        false
+    );
+
+</script>
+
+</body>
+</html>
+
